@@ -12,7 +12,7 @@ exports.handler = async (event, context, callback) => {
     
     var ticketType = slots.ticketType;
     
-    if (intent == 'GetTopTickets') {
+    if (intent == 'GetTickets') {
       var countTicket = slots.countTicket;
       var records = getTickets(ticketType, countTicket, callback);       // Get the records
     }
