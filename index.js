@@ -1,38 +1,34 @@
 
 var https = require('https');
 
-console.log('Loading function');
-
-exports.handler = async (event, context, callback) => {
-    // TODO implement
+exports.handler = async (event, context) => {
+   
     console.log('Received event:',JSON.stringify(event, null,2));
     
     var intent = event.currentIntent.name;
     var slots = event.currentIntent.slots;
     
-    var ticketType = slots.ticketType;
+    var ticketType = slots.ticketType.toLowerCase();
     
-    if (intent == 'GetTickets') {
-      var countTicket = slots.countTicket;
-      var records = getTickets(ticketType, countTicket, callback);       // Get the records
-    }
-    else if (intent == 'LogTicket') {
-      var shortDesc = slots.shortDesc;
-       logTicket(ticketType, shortDesc, callback);
-    }
+    return new Promise((resolve, reject) => {
+      
+      
+      if (intent == 'GetTickets') {
+        var ticketCount = slots.ticketCount;
+        getTickets(ticketType, ticketCount, resolve, reject);       // Get the records
+      }
+      else if (intent == 'LogTicket') {
+        var shortDesc = slots.shortDesc;
+        logTicket(ticketType, shortDesc, resolve, reject);
+      }
+    });
     
     
-    // const response = {
-    //    statusCode: 200,
-    //    body: JSON.stringify('Hello from Lambda!'),
-    // };
-    // return response;
 };
 
 // Get tickets from ServiceNow
 //
-function getTickets(recType, count, cb) {
-  console.log('In getRecords function');
+function getTickets(recType, count, resolve, reject) {
   
   var snowInstance = process.env.SERVICENOW_HOST;
 
@@ -50,13 +46,12 @@ function getTickets(recType, count, cb) {
   
   var request = https.request(options, function(response) {
       var returnData = '';
-      console.log('In https.request');
+     
       response.on('data', chunk => returnData += chunk);
 
       response.on('end', function() {
         var responseObj = JSON.parse(returnData);
-        console.log("Body = " + JSON.stringify(responseObj));
-        console.log ("sending response");
+        
         if(responseObj.result){
           let speechText =  "Here are the " + count + " most recent incidents: ";
           for (let i = 0; i < count; i++) {
@@ -76,21 +71,21 @@ function getTickets(recType, count, cb) {
               }
             }
           }
-          cb(null, retMsg);
+          resolve(retMsg);
         }
         else{
-          cb(null,JSON.parse('{"Error": "No tickets Found"}'));
+          reject(JSON.parse('{"Error": "No tickets Found"}'));
         }
         
       });
 
       response.on('error', e => context.fail('error:' + e.message));
     });
+    
    request.end();
 }
 
-function logTicket(recType, shortDesc, cb) {
-  console.log('In logTicket function');
+function logTicket(recType, shortDesc, resolve, request) {
   
   var requestData = {
         "short_description": shortDesc,
@@ -99,7 +94,18 @@ function logTicket(recType, shortDesc, cb) {
   };
   var postData = JSON.stringify(requestData);
     
-  a
+  var options = {
+        host: process.env.SERVICENOW_HOST,
+        port: '443',
+        path: '/api/now/table/' + recType,
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Basic ' + Buffer.from(process.env.SERVICENOW_USERNAME + ":" + process.env.SERVICENOW_PASSWORD).toString('base64'),
+            'Content-Length': Buffer.byteLength(postData)
+        }
+    };
     
     var request = https.request(options, function (res) {
         var body = '';
@@ -117,7 +123,7 @@ function logTicket(recType, shortDesc, cb) {
               }
             }
           }
-          cb(null, retMsg);
+          resolve(retMsg);
         });
         res.on('error', e => context.fail('error:' + e.message));
     });
